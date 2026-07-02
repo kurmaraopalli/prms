@@ -2,6 +2,86 @@
 
 This document provides the application variables, JPA Entity mappings, and exposed endpoints.
 
+## 🏗️ System Architecture
+
+The following diagram illustrates the 3-tier architecture of the PRMS application, including its controllers, JPA entities, database failover strategy, and front-end integration.
+
+```mermaid
+graph TD
+    classDef client fill:#eef2f7,stroke:#3b82f6,stroke-width:2px,color:#1e3a8a;
+    classDef api fill:#ecfdf5,stroke:#10b981,stroke-width:2px,color:#065f46;
+    classDef db fill:#fff7ed,stroke:#f97316,stroke-width:2px,color:#7c2d12;
+    classDef config fill:#faf5ff,stroke:#8b5cf6,stroke-width:2px,color:#4c1d95;
+
+    subgraph Client_Layer ["Client Layer"]
+        React["React UI (Port 3000)"]:::client
+    end
+
+    subgraph API_Layer ["Spring Boot REST API (Port 8080)"]
+        subgraph Controllers ["Controllers"]
+            PC["PatientController"]:::api
+            DC["DoctorController"]:::api
+            AC["AppointmentController"]:::api
+            MC["MedicalRecordController"]:::api
+        end
+
+        subgraph Repositories ["Spring Data JPA Repositories"]
+            PR["PatientRepository"]:::api
+            DR["DoctorRepository"]:::api
+            AR["AppointmentRepository"]:::api
+            MR["MedicalRecordRepository"]:::api
+        end
+
+        subgraph Models ["JPA Entities"]
+            Patient["Patient Entity"]:::api
+            Doctor["Doctor Entity"]:::api
+            Appointment["Appointment Entity"]:::api
+            MedRecord["MedicalRecord Entity"]:::api
+        end
+
+        DataSourceConfig["DataSourceConfig<br/>(Dynamic Failover Route)"]:::config
+    end
+
+    subgraph Database_Layer ["Database Layer"]
+        MySQL[("MySQL Database<br/>(Primary / Port 3306)")]:::db
+        H2[("H2 Database<br/>(File Failover Fallback)")]:::db
+    end
+
+    %% Client communicating with Controllers
+    React -->|HTTP REST API / CORS| PC
+    React -->|HTTP REST API / CORS| DC
+    React -->|HTTP REST API / CORS| AC
+    React -->|HTTP REST API / CORS| MC
+
+    %% Controller calls Repository
+    PC --> PR
+    DC --> DR
+    AC --> AR
+    MC --> MR
+
+    %% Repository maps Entity
+    PR -.-> Patient
+    DR -.-> Doctor
+    AR -.-> Appointment
+    MR -.-> MedRecord
+
+    %% Appointment & MedicalRecord references Patients / Doctors
+    Appointment --> Patient
+    Appointment --> Doctor
+    MedRecord --> Patient
+    MedRecord --> Doctor
+
+    %% DataSource Config Routing to Database
+    PR --> DataSourceConfig
+    DR --> DataSourceConfig
+    AR --> DataSourceConfig
+    MR --> DataSourceConfig
+
+    DataSourceConfig -->|Active Connection| MySQL
+    DataSourceConfig -->|Fallback Connection| H2
+```
+
+
 ## 🛠️ Configuration Settings (`application.properties`)
 
 ```properties
