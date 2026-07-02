@@ -8,10 +8,12 @@ The following diagram illustrates the 3-tier architecture of the PRMS applicatio
 
 ```mermaid
 graph TD
-    classDef client fill:#eef2f7,stroke:#3b82f6,stroke-width:2px,color:#1e3a8a;
-    classDef api fill:#ecfdf5,stroke:#10b981,stroke-width:2px,color:#065f46;
-    classDef db fill:#fff7ed,stroke:#f97316,stroke-width:2px,color:#7c2d12;
-    classDef config fill:#faf5ff,stroke:#8b5cf6,stroke-width:2px,color:#4c1d95;
+    classDef client fill:#eff6ff,stroke:#3b82f6,stroke-width:2px,color:#1e40af;
+    classDef controller fill:#ecfeff,stroke:#06b6d4,stroke-width:2px,color:#155e75;
+    classDef repo fill:#f0fdf4,stroke:#22c55e,stroke-width:2px,color:#166534;
+    classDef model fill:#faf5ff,stroke:#a855f7,stroke-width:2px,color:#6b21a8;
+    classDef config fill:#fff1f2,stroke:#f43f5e,stroke-width:2px,color:#9f1239;
+    classDef db fill:#fffbeb,stroke:#f59e0b,stroke-width:2px,color:#78350f;
 
     subgraph Client_Layer ["Client Layer"]
         React["React UI (Port 3000)"]:::client
@@ -19,27 +21,28 @@ graph TD
 
     subgraph API_Layer ["Spring Boot REST API (Port 8080)"]
         subgraph Controllers ["Controllers"]
-            PC["PatientController"]:::api
-            DC["DoctorController"]:::api
-            AC["AppointmentController"]:::api
-            MC["MedicalRecordController"]:::api
+            PC["PatientController"]:::controller
+            DC["DoctorController"]:::controller
+            AC["AppointmentController"]:::controller
+            MC["MedicalRecordController"]:::controller
         end
 
         subgraph Repositories ["Spring Data JPA Repositories"]
-            PR["PatientRepository"]:::api
-            DR["DoctorRepository"]:::api
-            AR["AppointmentRepository"]:::api
-            MR["MedicalRecordRepository"]:::api
+            PR["PatientRepository"]:::repo
+            DR["DoctorRepository"]:::repo
+            AR["AppointmentRepository"]:::repo
+            MR["MedicalRecordRepository"]:::repo
         end
 
         subgraph Models ["JPA Entities"]
-            Patient["Patient Entity"]:::api
-            Doctor["Doctor Entity"]:::api
-            Appointment["Appointment Entity"]:::api
-            MedRecord["MedicalRecord Entity"]:::api
+            Patient["Patient Entity"]:::model
+            Doctor["Doctor Entity"]:::model
+            Appointment["Appointment Entity"]:::model
+            MedRecord["MedicalRecord Entity"]:::model
         end
 
         DataSourceConfig["DataSourceConfig<br/>(Dynamic Failover Route)"]:::config
+        DS["DataSource Bean<br/>(Connection Provider)"]:::config
     end
 
     subgraph Database_Layer ["Database Layer"]
@@ -71,25 +74,49 @@ graph TD
     MedRecord --> Patient
     MedRecord --> Doctor
 
-    %% DataSource Config Routing to Database
-    PR --> DataSourceConfig
-    DR --> DataSourceConfig
-    AR --> DataSourceConfig
-    MR --> DataSourceConfig
+    %% DataSource Config defines DataSource Bean
+    DataSourceConfig -->|Configures & Instantiates| DS
 
-    DataSourceConfig -->|Active Connection| MySQL
-    DataSourceConfig -->|Fallback Connection| H2
+    %% Repositories use DataSource to connect
+    PR --> DS
+    DR --> DS
+    AR --> DS
+    MR --> DS
+
+    %% DataSource Routes connections
+    DS -->|Active Connection| MySQL
+    DS -->|Fallback Connection| H2
 ```
 
 
 ## 🛠️ Configuration Settings (`application.properties`)
 
 ```properties
-spring.datasource.url=jdbc:mysql://localhost:3306/prms_db?useSSL=false&allowPublicKeyRetrieval=true
-spring.datasource.username=root
-spring.datasource.password=your_secure_password
+spring.application.name=prms
+
+# MySQL configuration properties
+prms.db.mysql.url=jdbc:mysql://localhost:3306/prms_db?useSSL=false&allowPublicKeyRetrieval=true&createDatabaseIfNotExist=true
+prms.db.mysql.username=root
+prms.db.mysql.password=your_secure_password
+prms.db.mysql.driver-class-name=com.mysql.cj.jdbc.Driver
+prms.db.mysql.dialect=org.hibernate.dialect.MySQLDialect
+
+# H2 configuration properties (flat-file fallback)
+prms.db.h2.url=jdbc:h2:file:./prms_h2_db;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+prms.db.h2.username=sa
+prms.db.h2.password=welcome
+prms.db.h2.driver-class-name=org.h2.Driver
+prms.db.h2.dialect=org.hibernate.dialect.H2Dialect
+
+# Common JPA / Hibernate settings
 spring.jpa.hibernate.ddl-auto=update
 spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.format_sql=true
+
+# H2 Console (for debugging flat-file database contents)
+spring.h2.console.enabled=true
+spring.h2.console.path=/h2-console
+spring.h2.console.settings.web-allow-others=true
 ```
 
 ## 💻 Core Code Base
